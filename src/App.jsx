@@ -1,5 +1,4 @@
-import React, { Component } from "react";
-import PropTypes from "prop-types";
+import React, { useState, useEffect } from "react";
 import fetchImages from "./services/api-service";
 import {onShowErrorNotification} from "./services/notification"
 import SearchBar from "./components/SearchBar";
@@ -8,131 +7,101 @@ import LoadMoreButton from "./components/LoadMoreButton";
 import Spinner from "./components/Spinner";
 import Modal from "./components/Modal";
 
-export default class App extends Component {
-  static propTypes = {
-    searchQuery: PropTypes.string,
-  };
-  
-  state = {
-    searchQuery: "",
-    page: 1,
-    images: [],
-    selectedImg: null,
-    alt: null,
-    status: "idle"
-  }
+export default function App() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [selectedImg, setSelectedImg] = useState(null);
+  const [alt, setAlt] = useState(null);
+  const [status, setStatus] = useState("idle");
 
-  async componentDidUpdate(_, prevState) {
-    
-        const prevSearch = prevState.searchQuery;
-        const nextSearch = this.state.searchQuery;
+  useEffect(() => {
+    if (!searchQuery) {
+      return
+    }
 
-        const prevPage = prevState.page;
-        const nextPage = this.state.page;
+    setStatus("pending");
 
-    if (prevSearch !== nextSearch || prevPage !== nextPage) {
-      this.setState({ status: "pending", })
+    fetchImages(searchQuery, page).then((images) => {
 
-      try {
-        const images = await fetchImages(nextSearch, nextPage);
-        
-        if (!images.length) {
-          throw new Error();
-        }
-
-        this.setState(prevState => ({
-        images: [...prevState.images, ...images],
-        status: "resolved"
-        }))
-      } catch (error) {
-        onShowErrorNotification();
-        this.setState({ status: "rejected" });
-
+      if (!images.length) {
+        throw new Error();
       }
       
-      this.state.page > 1 &&
-        window.scrollTo({
+      setImages(prevImages => [...prevImages, ...images]);
+      setStatus("resolved");
+
+      page > 1 &&
+      window.scrollTo({
         top: document.documentElement.scrollHeight,
         behavior: 'smooth',
-        });
+      });
       
-    }
-}
+    }).catch((error) => {
+      console.log(error);
+      onShowErrorNotification();
+      setStatus("rejected");
+    })
+  }, [searchQuery, page])
 
-  handleFormSubmit = searchQuery => {
-    if (this.state.searchQuery === searchQuery) {
+  const handleFormSubmit = query => {
+    if (searchQuery === query) {
       return
     }
     
-    this.resetState();
-    this.setState({ searchQuery});
+    resetState();
+    setSearchQuery(query);
   };
 
-  loadMoreBtnClick = () => {
-        this.setState(prevState => ({
-         page: prevState.page + 1,
-        }));
-    }
+  const loadMoreBtnClick = () => {
+    setPage(prevPage => prevPage + 1);
+  }
 
-  handleSelectedImage = (largeImageUrl, tags) => {
-    this.setState({
-      selectedImg: largeImageUrl,
-      alt: tags
-    })
+  const handleSelectedImage = (largeImageUrl, tags) => {
+    setSelectedImg(largeImageUrl);
+    setAlt(tags);
   }
   
-  closeModal = () => {
-    this.setState({
-      selectedImg: null,
-    })
+  const closeModal = () => {
+    setSelectedImg(null)
   }
 
-  resetState = () => {
-    this.setState({
-      searchQuery: "",
-      page: 1,
-      images: [],
-      selectedImg: null,
-      alt: null,
-      status: "idle"
-    })
+  const resetState = () => {
+    setSearchQuery("");
+    setPage(1);
+    setImages([]);
+    setSelectedImg(null);
+    setAlt(null);
+    setStatus("idle");
   }
 
-  render() {
+  if (status === "idle") {
+    return <SearchBar onSubmit={handleFormSubmit} />
+  }
 
-    const { images, selectedImg, alt, status} = this.state;
-    
-    if (status === "idle") {
-      return <SearchBar onSubmit={this.handleFormSubmit} />
-    }
-
-    if (status === "pending") {
-      return (
-        <>
-          <SearchBar onSubmit={this.handleFormSubmit} />
-          <Spinner />
-          <ImageGallery images={images} selectedImage={this.handleSelectedImage}/>
-          {images.length > 0 && <LoadMoreButton onClick={this.loadMoreBtnClick} />}
-        </>
-      )
-    }
-
-    if (status === "resolved") {
-      return (
-        <>
-          <SearchBar onSubmit={this.handleFormSubmit} />
-          <ImageGallery images={images} selectedImage={this.handleSelectedImage}/>
-        {selectedImg && <Modal selectedImg={selectedImg} tags={alt} onClose={this.closeModal}/>}
-        {images.length > 0 && <LoadMoreButton onClick={this.loadMoreBtnClick}/>}
-        </>
-      )
-    }
-
-    if (status === "rejected") {
-      return <>
-        <SearchBar onSubmit={this.handleFormSubmit} />
+  if (status === "pending") {
+    return (
+      <>
+        <SearchBar onSubmit={handleFormSubmit} />
+        <Spinner />
+        <ImageGallery images={images} selectedImage={handleSelectedImage} />
+        {images.length > 0 && <LoadMoreButton onClick={loadMoreBtnClick} />}
       </>
-    }
+    )
+  }
+
+  if (status === "resolved") {
+    return (
+      <>
+        <SearchBar onSubmit={handleFormSubmit} />
+        <ImageGallery images={images} selectedImage={handleSelectedImage} />
+        {selectedImg && <Modal selectedImg={selectedImg} tags={alt} onClose={closeModal} />}
+        {images.length > 0 && <LoadMoreButton onClick={loadMoreBtnClick} />}
+      </>
+    )
+  }
+
+  if (status === "rejected") {
+    return <SearchBar onSubmit={handleFormSubmit} />
   }
 }
-
