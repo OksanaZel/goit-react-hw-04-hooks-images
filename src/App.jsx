@@ -20,30 +20,34 @@ export default function App() {
       return
     }
 
-    setStatus("pending");
+    async function getFetchIamges() {
+      setStatus("pending");
+      try {
+        const images = await fetchImages(searchQuery, page);
 
-    fetchImages(searchQuery, page).then((images) => {
-
-      if (!images.length) {
-        throw new Error();
+        if (!images.length) {
+          throw new Error();
+        }
+        
+        setImages(prevImages => [...prevImages, ...images]);
+        setStatus("resolved");
+        
+        page > 1 &&
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'smooth',
+          });
+        
+      } catch (error) {
+        console.log(error);
+        onShowErrorNotification();
+        setStatus("rejected");
       }
-      
-      setImages(prevImages => [...prevImages, ...images]);
-      setStatus("resolved");
+    }
+    getFetchIamges();
 
-      page > 1 &&
-      window.scrollTo({
-        top: document.documentElement.scrollHeight,
-        behavior: 'smooth',
-      });
-      
-    }).catch((error) => {
-      console.log(error);
-      onShowErrorNotification();
-      setStatus("rejected");
-    })
-  }, [searchQuery, page])
-
+  }, [searchQuery, page]);
+  
   const handleFormSubmit = query => {
     if (searchQuery === query) {
       return
